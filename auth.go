@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/sirupsen/logrus"
 	"time"
 
@@ -196,9 +197,23 @@ func checkJWTExpire(RefreshExpiration int64, expireTime time.Duration) bool {
 	return true
 }
 
-func parseJWTExpire(jwtToken string) (UnixTimeSecond int64) {
+func (sa *SSOAuth) parseJWTExpire(jwtToken string) (UnixTimeSecond int64, err error) {
+	hmacSampleSecret := []byte(sa.Config.JWTSecretKey)
 
-	return 0
+	token, err := jwt.ParseWithClaims(jwtToken, &SSOJWTClaim{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return hmacSampleSecret, nil
+	})
+
+	if claims, ok := token.Claims.(*SSOJWTClaim); ok && token.Valid {
+		logrus.Info(claims.EXP, claims.AK)
+		return claims.EXP, nil
+	} else {
+		logrus.Errorf("parse expire err")
+		return 0, err
+	}
 }
 
 // GetToken is main path to get jwt token
@@ -210,8 +225,8 @@ func (sa *SSOAuth) GetToken() (string, error) {
 		}
 		sa.JWTToken = auth.JWT
 		sa.RefreshToken = auth.RefreshToken
-		sa.Expiration = parseJWTExpire(auth.JWT)
-		sa.RefreshExpiration = parseJWTExpire(auth.RefreshExpiration)
+		sa.Expiration, _ = sa.parseJWTExpire(sa.JWTToken[7:])
+		sa.RefreshExpiration, _ = sa.parseJWTExpire(sa.RefreshToken[7:])
 		return auth.JWT, nil
 	}
 
@@ -222,7 +237,7 @@ func (sa *SSOAuth) GetToken() (string, error) {
 			return "", err
 		}
 		sa.JWTToken = token.JWT
-		sa.Expiration = parseJWTExpire(token.JWT)
+		sa.Expiration, _ = sa.parseJWTExpire(token.JWT[7:])
 		return token.JWT, nil
 	}
 

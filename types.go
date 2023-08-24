@@ -1,6 +1,9 @@
 package openxlab
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"github.com/golang-jwt/jwt/v5"
+)
 
 type LoginConfig struct {
 	AK           string `json:"ak"`
@@ -33,4 +36,10 @@ type AuthRequestBody struct {
 	AK           string `json:"ak,omitempty"`
 	D            string `json:"d,omitempty"`
 	RefreshToken string `json:"refresh_token,omitempty"`
+}
+
+type SSOJWTClaim struct {
+	EXP int64  `json:"exp"`
+	AK  string `json:"ak"`
+	jwt.RegisteredClaims
 }
