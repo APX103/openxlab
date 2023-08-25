@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -29,6 +30,7 @@ type SSOAuth struct {
 	RefreshToken      string       `json:"refresh_token"`
 	Expiration        int64        `json:"expiration"`
 	RefreshExpiration int64        `json:"refresh_expiration"`
+	l                 sync.Mutex
 }
 
 func HmacSha1(value, keyStr string) string {
@@ -218,6 +220,9 @@ func (sa *SSOAuth) parseJWTExpire(jwtToken string) (UnixTimeSecond int64, err er
 // GetToken is main path to get jwt token
 func (sa *SSOAuth) GetToken() (string, error) {
 	if sa.RefreshToken == "" || isJWTExpired(sa.RefreshExpiration, RefreshBeforeExpire) {
+		sa.l.Lock()
+		defer sa.l.Unlock()
+
 		auth, err := sa.Auth()
 		if err != nil {
 			return "", err
@@ -231,6 +236,9 @@ func (sa *SSOAuth) GetToken() (string, error) {
 
 	// if RefreshToken exists, JWTToken must have value
 	if isJWTExpired(sa.Expiration, RefreshBeforeExpire) {
+		sa.l.Lock()
+		defer sa.l.Unlock()
+
 		token, err := sa.GetRefreshedToken()
 		if err != nil {
 			return "", err
