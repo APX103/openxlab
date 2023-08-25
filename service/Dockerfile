@@ -5,11 +5,11 @@ ADD ./ /workspace/
 ENV GO_PROXY="https://goproxy.cn,direct"
 
 RUN go env -w GOPROXY=${GO_PROXY}
-RUN go build service/main.go
+RUN go build main.go
 
 FROM alpine:3.18.2
 
-COPY --from=builder /workspace/sso_token_service /workspace/sso_token_service
+COPY --from=builder /workspace/main /workspace/sso_token_service
 COPY config.yml /workspace/config.yml
 WORKDIR /workspace
 

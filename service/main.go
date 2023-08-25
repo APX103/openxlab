@@ -36,7 +36,6 @@ func (m *Formatter) Format(entry *logrus.Entry) ([]byte, error) {
 	return b.Bytes(), nil
 }
 
-var config *SSOConfig
 var sa *openxlab.SSOAuth
 
 func init() {
@@ -53,8 +52,13 @@ func init() {
 	logrus.SetFormatter(&Formatter{})
 
 	// inject config
-	getConfig(config)
+	config := getConfig(&SSOConfig{})
 	sa = openxlab.NewSSOAuth(config.AK, config.SK, config.JSK)
+	token, err := sa.GetToken()
+	if err != nil {
+		return
+	}
+	logrus.Debug(token)
 }
 
 // config
@@ -65,19 +69,21 @@ type SSOConfig struct {
 	JSK string `yaml:"jwt_secret_token"`
 }
 
-func getConfig(config *SSOConfig) {
+func getConfig(config *SSOConfig) *SSOConfig {
 	logrus.Debug(" Getting config ")
-	yamlFile, err := os.ReadFile("config.yaml")
+	yamlFile, err := os.ReadFile("./config.yml")
 	if err != nil {
-		logrus.Error(err)
+		logrus.Errorf("read file error: %s", err)
 		panic("Can not get config file")
 	}
 
 	err = yaml.Unmarshal(yamlFile, config)
 	if err != nil {
+		logrus.Errorf("can not marshal: %s", err)
 		panic(err)
 	}
 	logrus.Debug(" Got config ")
+	return config
 }
 
 // router
@@ -91,8 +97,16 @@ func Ping(c *gin.Context) {
 
 func GetToken(c *gin.Context) {
 	logrus.Info("getting token")
+	token, err := sa.GetToken()
+	if err != nil {
+		logrus.Errorf("get token error: %s", err)
+		c.JSON(500, gin.H{
+			"error": err,
+		})
+		return
+	}
 	c.JSON(200, gin.H{
-		"token": sa.GetToken(),
+		"token": token,
 	})
 }
 
