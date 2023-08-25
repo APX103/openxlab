@@ -6,9 +6,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/sirupsen/logrus"
-	"time"
 
 	"github.com/imroc/req/v3"
 )
@@ -18,7 +19,7 @@ const (
 	AuthPath            string        = "/auth"
 	GetJWTPath          string        = "/getJwt"
 	RefreshPath         string        = "/refreshJwt"
-	RefreshBeforeExpire time.Duration = 5
+	RefreshBeforeExpire time.Duration = 5 * time.Minute
 )
 
 // SSOAuth store refresh_token and jwt_token
@@ -188,13 +189,10 @@ func getTokenSet(ak string, d string) (*GetTokenResponseData, error) {
 	return jd, err
 }
 
-// checkJWTExpire check if jwt token need refresh
-func checkJWTExpire(RefreshExpiration int64, expireTime time.Duration) bool {
-	exp := time.Now().Unix() - RefreshExpiration
-	if time.Duration(exp)*time.Second < expireTime {
-		return false
-	}
-	return true
+// isJWTExpired check if jwt has expired with an offset
+func isJWTExpired(expiration int64, offset time.Duration) bool {
+	expireIn := expiration - time.Now().Unix()
+	return time.Duration(expireIn)*time.Second < offset
 }
 
 func (sa *SSOAuth) parseJWTExpire(jwtToken string) (UnixTimeSecond int64, err error) {
@@ -219,7 +217,7 @@ func (sa *SSOAuth) parseJWTExpire(jwtToken string) (UnixTimeSecond int64, err er
 
 // GetToken is main path to get jwt token
 func (sa *SSOAuth) GetToken() (string, error) {
-	if sa.RefreshToken == "" || checkJWTExpire(sa.RefreshExpiration, RefreshBeforeExpire) {
+	if sa.RefreshToken == "" || isJWTExpired(sa.RefreshExpiration, RefreshBeforeExpire) {
 		auth, err := sa.Auth()
 		if err != nil {
 			return "", err
@@ -232,7 +230,7 @@ func (sa *SSOAuth) GetToken() (string, error) {
 	}
 
 	// if RefreshToken exists, JWTToken must have value
-	if checkJWTExpire(sa.Expiration, RefreshBeforeExpire) {
+	if isJWTExpired(sa.Expiration, RefreshBeforeExpire) {
 		token, err := sa.GetRefreshedToken()
 		if err != nil {
 			return "", err
