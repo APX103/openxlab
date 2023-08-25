@@ -207,7 +207,8 @@ func (sa *SSOAuth) parseJWTExpire(jwtToken string) (UnixTimeSecond int64, err er
 		return hmacSampleSecret, nil
 	})
 
-	if claims, ok := token.Claims.(*SSOJWTClaim); ok && token.Valid {
+	// need valid : token.Valid
+	if claims, ok := token.Claims.(*SSOJWTClaim); ok {
 		logrus.Info(claims.EXP, claims.AK)
 		return claims.EXP, nil
 	} else {
