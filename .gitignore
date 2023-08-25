@@ -1,3 +1,4 @@
 .vscode
 .idea
 cli
+service/config.yaml
