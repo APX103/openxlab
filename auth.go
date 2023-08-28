@@ -97,6 +97,10 @@ func (sa *SSOAuth) GetRefreshedToken() (*GetTokenResponseData, error) {
 		logrus.Errorf("[refresh token set] bad response status: %s", resp.Status)
 		return nil, err
 	}
+	if result.Msg != "ok" {
+		logrus.Errorf("[refresh token set] msg not OK==ok, is: %s", result.Msg)
+		return nil, fmt.Errorf("msg not OK==ok, is: %s", result.Msg)
+	}
 
 	jd := &GetTokenResponseData{}
 	err = json.Unmarshal(result.Data, jd)
@@ -133,6 +137,10 @@ func getNonce(ak string) (string, string, error) {
 	if !resp.IsSuccessState() {
 		logrus.Errorf("[get nonce] bad response status: %s", resp.Status)
 		return "", "", err
+	}
+	if result.Msg != "ok" {
+		logrus.Errorf("[get nonce] msg not OK==ok, is: %s", result.Msg)
+		return "", "", fmt.Errorf("msg not OK==ok, is: %s", result.Msg)
 	}
 
 	var ad GetAuthResponseData
@@ -174,6 +182,10 @@ func getTokenSet(ak string, d string) (*GetTokenResponseData, error) {
 	if !resp.IsSuccessState() {
 		logrus.Errorf("[get token set] bad response status: %s", resp.Status)
 		return nil, err
+	}
+	if result.Msg != "ok" {
+		logrus.Errorf("[get token set] msg not OK==ok, is: %s", result.Msg)
+		return nil, fmt.Errorf("msg not OK==ok, is: %s", result.Msg)
 	}
 
 	jd := &GetTokenResponseData{}
@@ -217,37 +229,66 @@ func (sa *SSOAuth) parseJWTExpire(jwtToken string) (UnixTimeSecond int64, err er
 	}
 }
 
+// get token
+
+func auth(sa *SSOAuth) (string, error) {
+	logrus.Debug("Init refresh token of refresh it.")
+	auth, err := sa.Auth()
+	if err != nil {
+		return "", err
+	}
+	sa.JWTToken = auth.JWT
+	sa.RefreshToken = auth.RefreshToken
+	logrus.Debug(auth)
+	if len(auth.JWT) < 8 {
+		return "", fmt.Errorf("get token totally failed")
+	}
+	sa.Expiration, _ = sa.parseJWTExpire(sa.JWTToken[7:])
+	sa.RefreshExpiration, _ = sa.parseJWTExpire(sa.RefreshToken[7:])
+	return auth.JWT, nil
+}
+
+func refresh(sa *SSOAuth) (string, error) {
+	logrus.Debug("token need refresh")
+	token, err := sa.GetRefreshedToken()
+	if err != nil {
+		return "", err
+	}
+	logrus.Debug(token)
+	if len(token.JWT) < 8 {
+		return "", fmt.Errorf("can not refresh token, try auth")
+	}
+	sa.JWTToken = token.JWT
+	sa.Expiration, _ = sa.parseJWTExpire(token.JWT[7:])
+	return token.JWT, nil
+}
+
 // GetToken is main path to get jwt token
 func (sa *SSOAuth) GetToken() (string, error) {
-	if sa.RefreshToken == "" || isJWTExpired(sa.RefreshExpiration, RefreshBeforeExpire) {
-		sa.l.Lock()
-		defer sa.l.Unlock()
+	sa.l.Lock()
+	defer sa.l.Unlock()
 
-		auth, err := sa.Auth()
+	if sa.RefreshToken == "" || isJWTExpired(sa.RefreshExpiration, RefreshBeforeExpire) {
+		token, err := auth(sa)
 		if err != nil {
 			return "", err
 		}
-		sa.JWTToken = auth.JWT
-		sa.RefreshToken = auth.RefreshToken
-		sa.Expiration, _ = sa.parseJWTExpire(sa.JWTToken[7:])
-		sa.RefreshExpiration, _ = sa.parseJWTExpire(sa.RefreshToken[7:])
-		return auth.JWT, nil
+		return token, nil
 	}
 
 	// if RefreshToken exists, JWTToken must have value
 	if isJWTExpired(sa.Expiration, RefreshBeforeExpire) {
-		sa.l.Lock()
-		defer sa.l.Unlock()
-
-		token, err := sa.GetRefreshedToken()
+		token, err := refresh(sa)
 		if err != nil {
-			return "", err
+			token, err = auth(sa)
+			if err != nil {
+				return "", err
+			}
 		}
-		sa.JWTToken = token.JWT
-		sa.Expiration, _ = sa.parseJWTExpire(token.JWT[7:])
-		return token.JWT, nil
+		return token, nil
 	}
 
 	// get token from memory
+	logrus.Debug("get token directly")
 	return sa.GetExistToken(), nil
 }
