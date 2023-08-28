@@ -5,7 +5,7 @@ go 1.21.0
 require github.com/gin-gonic/gin v1.9.1
 
 require (
-	github.com/APX103/openxlab v0.0.0-20230825071845-a0e5847a8525 // indirect
+	github.com/APX103/openxlab v0.0.0-20230828042916-6723583c2d06 // indirect
 	github.com/andybalholm/brotli v1.0.5 // indirect
 	github.com/bytedance/sonic v1.9.1 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect

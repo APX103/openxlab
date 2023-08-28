@@ -185,6 +185,7 @@ func getTokenSet(ak string, d string) (*GetTokenResponseData, error) {
 	}
 	if result.Msg != "ok" {
 		logrus.Errorf("[get token set] msg not OK==ok, is: %s", result.Msg)
+		logrus.Debug(result)
 		return nil, fmt.Errorf("msg not OK==ok, is: %s", result.Msg)
 	}
 
@@ -237,12 +238,12 @@ func auth(sa *SSOAuth) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	sa.JWTToken = auth.JWT
-	sa.RefreshToken = auth.RefreshToken
 	logrus.Debug(auth)
 	if len(auth.JWT) < 8 {
 		return "", fmt.Errorf("get token totally failed")
 	}
+	sa.JWTToken = auth.JWT
+	sa.RefreshToken = auth.RefreshToken
 	sa.Expiration, _ = sa.parseJWTExpire(sa.JWTToken[7:])
 	sa.RefreshExpiration, _ = sa.parseJWTExpire(sa.RefreshToken[7:])
 	return auth.JWT, nil
@@ -259,7 +260,9 @@ func refresh(sa *SSOAuth) (string, error) {
 		return "", fmt.Errorf("can not refresh token, try auth")
 	}
 	sa.JWTToken = token.JWT
+	sa.RefreshToken = token.RefreshToken
 	sa.Expiration, _ = sa.parseJWTExpire(token.JWT[7:])
+	sa.RefreshExpiration, _ = sa.parseJWTExpire(token.RefreshToken[7:])
 	return token.JWT, nil
 }
 
